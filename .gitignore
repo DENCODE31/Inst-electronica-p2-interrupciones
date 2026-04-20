@@ -17,3 +17,5 @@ build/
 
 # Windows
 Thumbs.db
+# Plataformio
+.pio/
