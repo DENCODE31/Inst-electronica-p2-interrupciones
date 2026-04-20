@@ -1,3 +1,4 @@
+//Circuito de interrupciones en Arduino
 #include <Arduino.h>
 // Pin definitions
 const int interruptPin = 2;  // Interrupt pin (0 or 1 on most Arduino boards)
