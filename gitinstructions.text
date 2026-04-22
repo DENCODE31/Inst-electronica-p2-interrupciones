@@ -1,0 +1,23 @@
+# 1. Verificar el estado de tus archivos
+git status
+
+# 2. Agregar archivos al área de preparación
+git add .
+
+# 3. Hacer commit con un mensaje descriptivo
+git commit -m "Descripción de los cambios realizados"
+
+# 4. Subir los cambios al repositorio remoto
+git push origin main
+
+# 5. Flujo completo (si es la primera vez)
+git init
+git add .
+git commit -m "Commit inicial"
+git branch -M main
+git remote add origin https://github.com/usuario/repositorio.git
+git push -u origin main
+
+git add .
+git commit -m "Se agrega codigo timers"
+git push origin main

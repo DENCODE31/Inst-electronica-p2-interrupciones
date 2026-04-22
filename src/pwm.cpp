@@ -3,9 +3,6 @@
  *  EJERCICIO 4 — Salidas Analógicas PWM: Servo por Posición de Luz
  *  Materia  : Instrumentación Electrónica
  *  Placa    : ESP32 DevKit v1
- * git add .
-git commit -m "Se agrega codigo para controlar un servo SG90 mediante PWM en ESP32, basado en la posición de luz detectada por dos LDRs. Se integra la lógica de cálculo de resistencia y ángulo, y se mantiene el control de LEDs indicadores."
-git push
  * =====================================================================
  *
  *  OBJETIVO:

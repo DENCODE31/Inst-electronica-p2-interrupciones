@@ -4,9 +4,6 @@
  *  EJERCICIO 3 — Entradas Analógicas A/D: Dos LDRs
  *  Materia  : Instrumentación Electrónica
  *  Placa    : ESP32 DevKit v1
- * git add .
-git commit -m "Se agrega código para lectura de dos LDRs con ADC, cálculo de resistencia y posición de luz, y control de LEDs indicadores."
-git push
  * =====================================================================
  *
  *  OBJETIVO:
