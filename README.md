@@ -123,8 +123,8 @@ Inst-electronica-p2-interrupciones/
 
 ## 👥 Autores
 
-**DENCODE31** — Grupo de Instrumentación Electrónica  
-Universidad Nacional de Colombia · Sede Manizales · 2025-I
+**DENNIR** — Grupo de Instrumentación Electrónica  
+Universidad Nacional de Colombia · Sede Manizales · 2026-I
 
 ---
 
