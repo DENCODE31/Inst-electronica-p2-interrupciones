@@ -38,162 +38,111 @@
  *
  * =====================================================================
  */
+
 #include <Arduino.h>
-// ==================== DEFINICIÓN DE PINES ====================
-const int LDR1_PIN = A0;    // LDR 1 conectado a A0
-const int LDR2_PIN = A1;    // LDR 2 conectado a A1
-const int LED1_PIN = 13;    // LED indicador LDR 1
-const int LED2_PIN = 12;    // LED indicador LDR 2
 
-// ==================== CONSTANTES DE CALIBRACIÓN ====================
-const float VCC = 5.0;           // Voltaje de alimentación
-const float R_FIXED = 10000.0;   // Resistencia fija en divisor (10kΩ)
-const int NUM_SAMPLES = 10;      // Número de muestras para promediar
+// ── Pines ─────────────────────────────────────────────────────────────
+#define LDR_LEFT_PIN    34    // ADC1 canal 6 — LDR izquierdo
+#define LDR_RIGHT_PIN   35    // ADC1 canal 7 — LDR derecho
+#define LED_LEFT_PIN    25    // LED alarma izquierda
+#define LED_RIGHT_PIN   26    // LED alarma derecha
 
-// ==================== VARIABLES GLOBALES ====================
-float resistance_LDR1 = 0;
-float resistance_LDR2 = 0;
-float light_position = 0;        // -100 a 100: negativo=más luz en LDR1, positivo=más luz en LDR2
+// ── Constantes del divisor de voltaje ─────────────────────────────────
+#define V_REF           3.3f  // Voltaje de referencia del ESP32 [V]
+#define R_FIXED         10000.0f  // Resistencia fija del divisor [Ω]
+#define ADC_RESOLUTION  4095  // Resolución 12 bits del ESP32
 
-// ==================== FUNCIÓN SETUP ====================
-void setup() 
-{
-    Serial.begin(9600);
-    pinMode(LED1_PIN, OUTPUT);
-    pinMode(LED2_PIN, OUTPUT);
-    digitalWrite(LED1_PIN, LOW);
-    digitalWrite(LED2_PIN, LOW);
-    
-    delay(1000);
-    Serial.println("=== Sistema de Detección de Posición de Luz ===");
-    Serial.println("Iniciando lectura de sensores LDR...\n");
+// ── Umbral de decisión ────────────────────────────────────────────────
+// Si la diferencia de resistencias supera este valor, se activa el LED
+#define THRESHOLD       1000.0f   // [Ω]
+
+
+// =====================================================================
+//  FUNCIÓN: Convierte lectura ADC a resistencia del LDR
+// =====================================================================
+float adcToResistance(int adcValue) {
+
+    // Evita división por cero si el pin está en cortocircuito a GND
+    if (adcValue <= 0) return 999999.0f;
+
+    // Escala ADC → Voltaje
+    float voltage = (adcValue / (float)ADC_RESOLUTION) * V_REF;
+
+    // Evita división por cero si el voltaje es prácticamente cero
+    if (voltage <= 0.0f) return 999999.0f;
+
+    // Fórmula del divisor de voltaje despejada para R_LDR
+    return R_FIXED * ((V_REF / voltage) - 1.0f);
 }
 
-// ==================== FUNCIÓN LOOP PRINCIPAL ====================
-void loop() 
-{
-    // Leer y promediar valores analógicos
-    int raw_LDR1 = readAverageSensor(LDR1_PIN);
-    int raw_LDR2 = readAverageSensor(LDR2_PIN);
-    
-    // Convertir a voltaje
-    float voltage_LDR1 = (raw_LDR1 / 1023.0) * VCC;
-    float voltage_LDR2 = (raw_LDR2 / 1023.0) * VCC;
-    
-    // Calcular resistencias usando divisor de voltaje: Vout = VCC * R_LDR / (R_fixed + R_LDR)
-    resistance_LDR1 = calculateResistance(voltage_LDR1);
-    resistance_LDR2 = calculateResistance(voltage_LDR2);
-    
-    // Calcular posición relativa del foco de luz (-100 a 100)
-    light_position = calculateLightPosition(resistance_LDR1, resistance_LDR2);
-    
-    // Controlar LEDs según posición
-    controlLEDs(light_position);
-    
-    // Enviar datos al monitor serial
-    printSerialData(raw_LDR1, raw_LDR2, resistance_LDR1, resistance_LDR2, light_position);
-    
-    delay(500);  // Actualizar cada 500ms
+
+// =====================================================================
+//  SETUP
+// =====================================================================
+void setup() {
+
+    Serial.begin(115200);
+
+    // Fuerza resolución de 12 bits en el ADC del ESP32
+    analogReadResolution(12);
+
+    pinMode(LED_LEFT_PIN,  OUTPUT);
+    pinMode(LED_RIGHT_PIN, OUTPUT);
+
+    // Header para Serial Plotter (Tools → Serial Plotter)
+    Serial.println("R_LDR_Izq[Ohm],R_LDR_Der[Ohm]");
+
+    Serial.println("================================================");
+    Serial.println(" EJ3: Lectura de dos LDRs con conversion A/D");
+    Serial.println("================================================");
 }
 
-// ==================== FUNCIÓN: LEER Y PROMEDIAR SENSOR ====================
-int readAverageSensor(int pin) 
-{
-    long sum = 0;
-    
-    for (int i = 0; i < NUM_SAMPLES; i++) 
-    {
-        sum += analogRead(pin);
-        delay(10);
+
+// =====================================================================
+//  LOOP
+// =====================================================================
+void loop() {
+
+    // 1. Leer valores crudos del ADC
+    int rawLeft  = analogRead(LDR_LEFT_PIN);
+    int rawRight = analogRead(LDR_RIGHT_PIN);
+
+    // 2. Convertir ADC → Resistencia del LDR
+    float rLeft  = adcToResistance(rawLeft);
+    float rRight = adcToResistance(rawRight);
+
+    // 3. Calcular diferencia
+    //    diff > 0  →  rLeft > rRight  →  más luz a la DERECHA
+    //    diff < 0  →  rLeft < rRight  →  más luz a la IZQUIERDA
+    float diff = rLeft - rRight;
+
+    // 4. Alarma visual con LEDs
+    if (diff > THRESHOLD) {
+        // Más luz en la derecha: apaga LED izq, enciende LED der
+        digitalWrite(LED_LEFT_PIN,  LOW);
+        digitalWrite(LED_RIGHT_PIN, HIGH);
+
+    } else if (diff < -THRESHOLD) {
+        // Más luz en la izquierda: enciende LED izq, apaga LED der
+        digitalWrite(LED_LEFT_PIN,  HIGH);
+        digitalWrite(LED_RIGHT_PIN, LOW);
+
+    } else {
+        // Luz equilibrada o centrada: ambos LEDs encendidos
+        digitalWrite(LED_LEFT_PIN,  HIGH);
+        digitalWrite(LED_RIGHT_PIN, HIGH);
     }
-    
-    return sum / NUM_SAMPLES;
-}
 
-// ==================== FUNCIÓN: CALCULAR RESISTENCIA ====================
-float calculateResistance(float voltage) 
-{
-    if (voltage >= VCC || voltage <= 0) 
-    {
-        return 0;
-    }
-    
-    // R_LDR = R_fixed * (VCC - V_out) / V_out
-    return R_FIXED * (VCC - voltage) / voltage;
-}
+    // 5. Imprimir en monitor serial
+    Serial.print("ADC_Izq="); Serial.print(rawLeft);
+    Serial.print(" | R_Izq="); Serial.print(rLeft, 1); Serial.print(" Ohm");
+    Serial.print("   ||   ");
+    Serial.print("ADC_Der="); Serial.print(rawRight);
+    Serial.print(" | R_Der="); Serial.print(rRight, 1); Serial.print(" Ohm");
 
-// ==================== FUNCIÓN: CALCULAR POSICIÓN DEL FOCO ====================
-float calculateLightPosition(float res1, float res2) 
-{
-    // Normalizar: valores más bajos de resistencia = más luz
-    // Rango: -100 (luz en LDR1) a +100 (luz en LDR2)
-    
-    if (res1 + res2 == 0) 
-    {
-        return 0;
-    }
-    
-    // Calcular porcentaje de luz en cada sensor
-    float light_ratio = (res2 - res1) / (res1 + res2);
-    return light_ratio * 100.0;
-}
+    if (diff > THRESHOLD)        Serial.println("  ->  Foco: DERECHA");
+    else if (diff < -THRESHOLD)  Serial.println("  ->  Foco: IZQUIERDA");
+    else                         Serial.println("  ->  Foco: CENTRO");
 
-// ==================== FUNCIÓN: CONTROLAR LEDs ====================
-void controlLEDs(float position) 
-{
-    const float THRESHOLD = 10.0;  // Umbral de diferencia
-    
-    if (position < -THRESHOLD) 
-    {
-        // Más luz en LDR1
-        digitalWrite(LED1_PIN, HIGH);
-        digitalWrite(LED2_PIN, LOW);
-    } 
-    else if (position > THRESHOLD) 
-    {
-        // Más luz en LDR2
-        digitalWrite(LED1_PIN, LOW);
-        digitalWrite(LED2_PIN, HIGH);
-    } 
-    else 
-    {
-        // Luz equilibrada
-        digitalWrite(LED1_PIN, LOW);
-        digitalWrite(LED2_PIN, LOW);
-    }
-}
-
-// ==================== FUNCIÓN: IMPRIMIR DATOS EN SERIAL ====================
-void printSerialData(int raw1, int raw2, float res1, float res2, float position) 
-{
-    Serial.print("ADC1: ");
-    Serial.print(raw1);
-    Serial.print(" | ADC2: ");
-    Serial.print(raw2);
-    Serial.print(" | R_LDR1: ");
-    Serial.print(res1);
-    Serial.print("Ω | R_LDR2: ");
-    Serial.print(res2);
-    Serial.print("Ω | Posición: ");
-    Serial.print(position, 1);
-    Serial.println("%");
-    
-    // Indicador visual en serial
-    Serial.print("Luz: [");
-    for (int i = 0; i < 20; i++) 
-    {
-        if (i < 10 - (position / 10)) 
-        {
-            Serial.print(">");
-        }
-        else if (i > 10 + (position / 10)) 
-        {
-            Serial.print("<");
-        }
-        else 
-        {
-            Serial.print("-");
-        }
-    }
-    Serial.println("]");
+    delay(200);
 }

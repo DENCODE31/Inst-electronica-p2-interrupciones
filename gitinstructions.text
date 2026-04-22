@@ -19,5 +19,5 @@ git remote add origin https://github.com/usuario/repositorio.git
 git push -u origin main
 
 git add .
-git commit -m "Se agrega codigo timers"
+git commit -m "Se modifico Readme"
 git push origin main
