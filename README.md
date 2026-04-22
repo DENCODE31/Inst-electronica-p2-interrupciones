@@ -4,5 +4,5 @@ Implementación de interrupciones, temporizadores, entradas analógicas y PWM en
 git pull
 # trabajas
 git add .
-git commit -m "mensaje claro"
+git commit -m "Cree archivo conversionAD"
 git push
