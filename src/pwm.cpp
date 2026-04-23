@@ -44,9 +44,9 @@
 // ── Pines ─────────────────────────────────────────────────────────────
 #define LDR_LEFT_PIN    34
 #define LDR_RIGHT_PIN   35
-#define LED_LEFT_PIN    25
+#define LED_LEFT_PIN    27
 #define LED_RIGHT_PIN   26
-#define SERVO_PIN       18
+#define SERVO_PIN       13
 
 // ── Constantes del divisor de voltaje ─────────────────────────────────
 #define V_REF           3.3f
@@ -108,7 +108,7 @@ void loop() {
     int rawRight = analogRead(LDR_RIGHT_PIN);
 
     // 2. Convertir a resistencia
-    float rLeft  = adcToResistance(rawLeft);
+    float rLeft  = adcToResistance(rawLeft)/4;
     float rRight = adcToResistance(rawRight);
 
     // 3. Calcular ángulo del servo
