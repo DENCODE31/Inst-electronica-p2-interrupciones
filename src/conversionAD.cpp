@@ -44,7 +44,7 @@
 // ── Pines ─────────────────────────────────────────────────────────────
 #define LDR_LEFT_PIN    34    // ADC1 canal 6 — LDR izquierdo
 #define LDR_RIGHT_PIN   35    // ADC1 canal 7 — LDR derecho
-#define LED_LEFT_PIN    25    // LED alarma izquierda
+#define LED_LEFT_PIN    27    // LED alarma izquierda
 #define LED_RIGHT_PIN   26    // LED alarma derecha
 
 // ── Constantes del divisor de voltaje ─────────────────────────────────
@@ -108,7 +108,7 @@ void loop() {
     int rawRight = analogRead(LDR_RIGHT_PIN);
 
     // 2. Convertir ADC → Resistencia del LDR
-    float rLeft  = adcToResistance(rawLeft);
+    float rLeft  = adcToResistance(rawLeft)/4.2;
     float rRight = adcToResistance(rawRight);
 
     // 3. Calcular diferencia
