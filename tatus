@@ -1,0 +1,20 @@
+* [33mc53ff69[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m ACTUALIZACION INTERRUPCIONES
+* [33m90352a9[m Configuracion de pines servo
+*   [33m7482940[m Merge branch 'main' of https://github.com/DENCODE31/Inst-electronica-p2-interrupciones
+[32m|[m[33m\[m  
+[32m|[m * [33mac03d06[m Actualizacion de timer.cpp
+* [33m|[m [33m2bb6cbd[m Actualizacion pines
+[33m|[m[33m/[m  
+* [33m07cf785[m actualizacion_interrup_esp32Lora
+* [33m51dc0c1[m Se modifico Readme
+* [33mb3ae8e8[m Se modifico Readme
+* [33m3a85685[m Se modifico Readme
+* [33ma9464d2[m Se agrega codigo timers
+* [33me5f68d7[m Se agrega codigo para controlar un servo SG90 mediante PWM en ESP32, basado en la posición de luz detectada por dos LDRs. Se integra la lógica de cálculo de resistencia y ángulo, y se mantiene el control de LEDs indicadores.
+* [33mf51e9e5[m Se agrega código para lectura de dos LDRs con ADC, cálculo de resistencia y posición de luz, y control de LEDs indicadores.
+* [33m29cdd77[m Cree archivo conversionAD
+* [33m9814072[m Corrige estructura e integra PlatformIO en el repo
+* [33mc812b83[m Inicializa proyecto con PlatformIO
+* [33m4ef34bd[m Update .gitignore
+* [33m8797d49[m Add .gitignore for Arduino and IDE files
+* [33m320351f[m Initial commit
