@@ -26,5 +26,5 @@ git push origin main
 # Cuando el usuario pida subir cambios al repositorio, pedir solo el nombre
 # del commit y ejecutar este flujo:
 git add .
-git commit -m "nombre de la actualizacion"
+git commit -m "ACTUALIZACION INTERRUPCIONES"
 git push

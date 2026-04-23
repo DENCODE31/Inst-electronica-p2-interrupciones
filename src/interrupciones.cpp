@@ -6,163 +6,106 @@
  * =====================================================================
  *
  *  OBJETIVO:
- *    Emular una senal digital desde un pin de salida y detectarla con
- *    una interrupcion externa en otro pin. Cada cambio en la entrada
- *    alterna el estado del LED integrado de la placa y aumenta un
- *    contador mostrado en la pantalla OLED integrada.
+ * El debounce por software tiene la ventaja de no requerir componentes adicionales. Resolvemos el rebote únicamente modificando el código de nuestro programa.
+    Como desventaja, incrementa levemente el tiempo de ejecución y la complejidad del código. Además, si no aplicamos el código correctamente podemos ignorar interrupciones “verdaderas”.
+    La forma más sencilla de aplicar un debounce por software es comprobar el tiempo entre disparos de la interrupción. Si el tiempo es inferior a un determinado umbral de tiempo (threshold) simplemente ignoramos la interrupción. En definitiva, hemos definido una “zona muerta” en la que ignoramos las interrupciones generadas.
+    Para aplicar el debounce por software, modificamos la función ISR de la siguiente forma.
  *
- *  EQUIVALENCIA CON EL EJEMPLO ORIGINAL:
- *    Arduino emuPin = 10  -> ESP32V3 GPIO 47
- *    Arduino intPin = 2   -> ESP32V3 GPIO 48
- *    Arduino LEDPin = 13  -> ESP32V3 LED integrado GPIO 35
  *
  *  ESQUEMA DE CONEXION:
  *
  *    PIN MAP ESP32V3:
  *
- *    GPIO 47 -------------- GPIO 48
- *    salida emulada         entrada de interrupcion
+ *     --------GPIO 48
+ *             Pulsador
  *
  *    LED integrado: GPIO 35
  *    OLED integrado: SDA GPIO 17, SCL GPIO 18, RST GPIO 21
  *
- *  NOTAS:
- *    - Unimos fisicamente GPIO 47 con GPIO 48 usando un jumper.
- *    - No conectes GPIO 47 ni GPIO 48 a 5V; la ESP32V3 trabaja a 3.3V.
- *    - Se usa CHANGE para activar la interrupcion tanto en subida como
- *      en bajada, igual que en el codigo base.
+
  *
  * =====================================================================
  */
-
-#include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-// =====================================================================
-//  Pines adaptados para ESP32V3 WiFi V3
-// =====================================================================
-#define EMU_PIN   47  // Pin que genera la senal emulada.
-#define LED_PIN   35  // Pin del LED integrado de la ESP32V3.
-#define INT_PIN   48  // Pin que recibe la interrupcion desde EMU_PIN.
-#define VEXT_PIN  36  // Pin que habilita la alimentacion externa/OLED.
+// ── Pines OLED ESP32 WiFi LoRa 32 V3 ─────────────────────────────────────
+#define OLED_SDA    17
+#define OLED_SCL    18
+#define OLED_RST    21
+#define VEXT_PIN    36     // ← Habilita alimentación del display (activo LOW)
+#define SCREEN_W   128
+#define SCREEN_H    64
 
-// =====================================================================
-//  Pantalla OLED integrada
-// =====================================================================
-#define OLED_WIDTH   128
-#define OLED_HEIGHT  64
-#define OLED_ADDR    0x3C
-#define OLED_SDA     17
-#define OLED_SCL     18
-#define OLED_RST     21
+Adafruit_SSD1306 display(SCREEN_W, SCREEN_H, &Wire, OLED_RST);
 
-// =====================================================================
-//  Variables compartidas con la ISR; usan volatile porque cambian dentro
-//  de la interrupcion y el loop debe leer siempre su valor mas reciente.
-// =====================================================================
-volatile bool          ledState            = LOW;   // Guarda el estado actual del LED.
-volatile bool          displayNeedsUpdate  = true;  // Avisa al loop que debe actualizar la OLED.
-volatile unsigned long interruptCount      = 0;     // Cuenta cuantas interrupciones han ocurrido.
+// ── Configuración de interrupción ──────────────────────────────────────────
+const int          TIME_THRESHOLD = 150;
+const int          INT_PIN        = 48;
 
-Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RST);
+volatile int           isrCounter = 0;
+volatile unsigned long startTime  = 0;
+int counter = 0;
 
-// =====================================================================
-//  ISR: se ejecuta con cada cambio detectado en INT_PIN; alterna el LED,
-//  suma una interrupcion al contador y marca la OLED para refrescarse.
-// =====================================================================
-void IRAM_ATTR blink() {
-    ledState = !ledState;
-    interruptCount++;
-    displayNeedsUpdate = true;
-
-    digitalWrite(LED_PIN, ledState);
+// ── ISR ────────────────────────────────────────────────────────────────────
+void IRAM_ATTR debounceCount() {
+  if (millis() - startTime > TIME_THRESHOLD) {
+    isrCounter++;
+    startTime = millis();
+  }
 }
 
-// =====================================================================
-//  Actualiza la pantalla OLED con el contador y el estado del LED
-// =====================================================================
-void updateDisplay(unsigned long count, bool ledOn) {
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
+// ── Función auxiliar: refresca pantalla ───────────────────────────────────
+void updateDisplay(int count) {
+  display.clearDisplay();
 
-    display.setTextSize(1);
-    display.setCursor(2, 0);
-    display.println("Interrupciones");
-    
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Contador pulsos:");
 
-    display.setTextSize(2);
-    display.setCursor(0, 26);
-    display.print("Cnt: ");
-    display.println(count);
+  display.setTextSize(4);
+  display.setCursor(20, 24);
+  display.println(count);
 
-    display.setTextSize(1);
-    display.setCursor(0, 54);
-    display.print("LED: ");
-    display.println(ledOn ? "ON" : "OFF");
-
-    display.display();
+  display.display();
 }
 
-// =====================================================================
-//  SETUP
-// =====================================================================
+// ── Setup ──────────────────────────────────────────────────────────────────
 void setup() {
-    Serial.begin(115200);
+  Serial.begin(115200);
 
-    pinMode(EMU_PIN, OUTPUT);        // Configura GPIO47 como salida.
-    pinMode(LED_PIN, OUTPUT);        // Configura el LED integrado como salida.
-    pinMode(INT_PIN, INPUT_PULLUP);  // Configura GPIO48 como entrada con pull-up.
-    pinMode(VEXT_PIN, OUTPUT);       // Configura el control de alimentacion OLED.
+  // Habilitar Vext ANTES de cualquier operación con el display
+  pinMode(VEXT_PIN, OUTPUT);
+  digitalWrite(VEXT_PIN, LOW);   // LOW = Vext ON en la Heltec V3
+  delay(100);                    // Tiempo para que el rail estabilice
 
-    digitalWrite(EMU_PIN, LOW);      // Inicia la senal emulada en estado bajo.
-    digitalWrite(LED_PIN, LOW);      // Inicia el LED apagado.
+  // Reset manual del SSD1306
+  Wire.begin(OLED_SDA, OLED_SCL);
+  pinMode(OLED_RST, OUTPUT);
+  digitalWrite(OLED_RST, LOW);
+  delay(20);
+  digitalWrite(OLED_RST, HIGH);
 
-    // Habilita la alimentacion externa/OLED en ESP32V3.
-    digitalWrite(VEXT_PIN, LOW);
-    delay(100);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("ERROR: display SSD1306 no encontrado");
+    while (true);
+  }
 
-    Wire.begin(OLED_SDA, OLED_SCL);
+  display.clearDisplay();
+  display.display();
+  updateDisplay(0);
 
-    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-        Serial.println("No se detecto la pantalla OLED");
-    } else {
-        updateDisplay(0, ledState);
-    }
-
-    attachInterrupt(digitalPinToInterrupt(INT_PIN), blink, CHANGE);  // Ejecuta blink() en cada cambio de GPIO48.
+  pinMode(INT_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(INT_PIN), debounceCount, FALLING);
 }
 
-// =====================================================================
-//  LOOP
-// =====================================================================
+// ── Loop ───────────────────────────────────────────────────────────────────
 void loop() {
-    static unsigned long lastToggle = 0;
-    static bool          emuState   = LOW;
-
-    // Emula una senal cuadrada para disparar la interrupcion.
-    if (millis() - lastToggle >= 150) {  // Cambia el estado cada 150 ms.
-        lastToggle = millis();       // Guarda el tiempo del ultimo cambio.
-        emuState   = !emuState;      // Invierte la senal emulada HIGH/LOW.
-        digitalWrite(EMU_PIN, emuState);
-    }
-
-    if (displayNeedsUpdate) {
-        noInterrupts();
-
-        unsigned long count = interruptCount;
-        bool          ledOn = ledState;
-
-        displayNeedsUpdate  = false;
-
-        interrupts();
-
-        Serial.print("Interrupciones: ");
-        Serial.print(count);
-        Serial.print(" | LED: ");
-        Serial.println(ledOn ? "ON" : "OFF");
-
-        updateDisplay(count, ledOn);
-    }
+  if (counter != isrCounter) {
+    counter = isrCounter;
+    Serial.println(counter);
+    updateDisplay(counter);
+  }
 }

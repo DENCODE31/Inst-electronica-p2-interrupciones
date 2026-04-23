@@ -23,7 +23,7 @@
  *    - La interrupcion se activa en FALLING: HIGH -> LOW al presionar.
  *    - El debounce por software acepta un pulso solo si ya pasaron
  *      150 ms desde el ultimo pulso valido.
- *    - No uses 5V en los GPIO de la Heltec; trabaja con 3.3V.
+ *    
  *
  * =====================================================================
  */
