@@ -2,7 +2,7 @@
  * =====================================================================
  *  EJERCICIO 1 - Interrupciones con senal emulada
  *  Materia  : Instrumentacion Electronica
- *  Placa    : Heltec WiFi LoRa 32 V3 (ESP32-S3)
+ *  Placa    : ESP32V3 (ESP32-S3)
  * =====================================================================
  *
  *  OBJETIVO:
@@ -12,13 +12,13 @@
  *    contador mostrado en la pantalla OLED integrada.
  *
  *  EQUIVALENCIA CON EL EJEMPLO ORIGINAL:
- *    Arduino emuPin = 10  -> Heltec GPIO 47
- *    Arduino intPin = 2   -> Heltec GPIO 48
- *    Arduino LEDPin = 13  -> Heltec LED integrado GPIO 35
+ *    Arduino emuPin = 10  -> ESP32V3 GPIO 47
+ *    Arduino intPin = 2   -> ESP32V3 GPIO 48
+ *    Arduino LEDPin = 13  -> ESP32V3 LED integrado GPIO 35
  *
  *  ESQUEMA DE CONEXION:
  *
- *    Heltec WiFi LoRa 32 V3:
+ *    PIN MAP ESP32V3:
  *
  *    GPIO 47 -------------- GPIO 48
  *    salida emulada         entrada de interrupcion
@@ -27,8 +27,8 @@
  *    OLED integrado: SDA GPIO 17, SCL GPIO 18, RST GPIO 21
  *
  *  NOTAS:
- *    - Une fisicamente GPIO 47 con GPIO 48 usando un jumper.
- *    - No conectes GPIO 47 ni GPIO 48 a 5V; la Heltec trabaja a 3.3V.
+ *    - Unimos fisicamente GPIO 47 con GPIO 48 usando un jumper.
+ *    - No conectes GPIO 47 ni GPIO 48 a 5V; la ESP32V3 trabaja a 3.3V.
  *    - Se usa CHANGE para activar la interrupcion tanto en subida como
  *      en bajada, igual que en el codigo base.
  *
@@ -41,10 +41,10 @@
 #include <Adafruit_SSD1306.h>
 
 // =====================================================================
-//  Pines adaptados para Heltec WiFi LoRa 32 V3
+//  Pines adaptados para ESP32V3 WiFi V3
 // =====================================================================
 #define EMU_PIN   47  // Pin que genera la senal emulada.
-#define LED_PIN   35  // Pin del LED integrado de la Heltec V3.
+#define LED_PIN   35  // Pin del LED integrado de la ESP32V3.
 #define INT_PIN   48  // Pin que recibe la interrupcion desde EMU_PIN.
 #define VEXT_PIN  36  // Pin que habilita la alimentacion externa/OLED.
 
@@ -119,7 +119,7 @@ void setup() {
     digitalWrite(EMU_PIN, LOW);      // Inicia la senal emulada en estado bajo.
     digitalWrite(LED_PIN, LOW);      // Inicia el LED apagado.
 
-    // Habilita la alimentacion externa/OLED en Heltec.
+    // Habilita la alimentacion externa/OLED en ESP32V3.
     digitalWrite(VEXT_PIN, LOW);
     delay(100);
 
