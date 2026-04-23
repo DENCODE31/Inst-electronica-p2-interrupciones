@@ -123,7 +123,7 @@ Inst-electronica-p2-interrupciones/
 
 ## 👥 Autores
 
-**Liseth Carolina Yela - Yeison Dénnir Termaal** — Grupo 7 Instrumentación Electrónica  
+**Liseth Carolina Yela - Yeison Dénnir Termal** — Grupo 7 Instrumentación Electrónica  
 Universidad Nacional de Colombia · Sede Manizales · 2026-I
 
 ---

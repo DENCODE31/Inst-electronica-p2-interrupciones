@@ -21,3 +21,10 @@ git push -u origin main
 git add .
 git commit -m "Se modifico Readme"
 git push origin main
+
+# Preferencia para Codex:
+# Cuando el usuario pida subir cambios al repositorio, pedir solo el nombre
+# del commit y ejecutar este flujo:
+git add .
+git commit -m "nombre de la actualizacion"
+git push

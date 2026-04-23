@@ -1,107 +1,168 @@
 /*
  * =====================================================================
- *  EJERCICIO 1 — Interrupciones y Antirrebote
- *  Materia  : Instrumentación Electrónica
- *  Placa    : ESP32 DevKit v1
+ *  EJERCICIO 1 - Interrupciones con senal emulada
+ *  Materia  : Instrumentacion Electronica
+ *  Placa    : Heltec WiFi LoRa 32 V3 (ESP32-S3)
  * =====================================================================
  *
  *  OBJETIVO:
- *    Contar pulsos de un botón usando interrupciones externas.
- *    Se aplica antirrebote por HARDWARE y por SOFTWARE para evitar
- *    conteos falsos causados por el rebote mecánico del botón.
+ *    Emular una senal digital desde un pin de salida y detectarla con
+ *    una interrupcion externa en otro pin. Cada cambio en la entrada
+ *    alterna el estado del LED integrado de la placa y aumenta un
+ *    contador mostrado en la pantalla OLED integrada.
  *
- *  ANTIRREBOTE HARDWARE:
- *    Condensador de 100nF entre el pin del botón y GND.
- *    Filtra los picos de voltaje generados por el rebote mecánico.
+ *  EQUIVALENCIA CON EL EJEMPLO ORIGINAL:
+ *    Arduino emuPin = 10  -> Heltec GPIO 47
+ *    Arduino intPin = 2   -> Heltec GPIO 48
+ *    Arduino LEDPin = 13  -> Heltec LED integrado GPIO 35
  *
- *  ANTIRREBOTE SOFTWARE:
- *    Dentro de la ISR se verifica que haya pasado al menos
- *    DEBOUNCE_MS milisegundos desde el último pulso válido.
+ *  ESQUEMA DE CONEXION:
  *
- *  ESQUEMA DE CONEXIÓN:
+ *    Heltec WiFi LoRa 32 V3:
  *
- *    3.3V ── 10kΩ ──┬── GPIO 18
- *                   │
- *                 Botón ── 100nF ── GND
- *                   │
- *                  GND
+ *    GPIO 47 -------------- GPIO 48
+ *    salida emulada         entrada de interrupcion
+ *
+ *    LED integrado: GPIO 35
+ *    OLED integrado: SDA GPIO 17, SCL GPIO 18, RST GPIO 21
+ *
+ *  NOTAS:
+ *    - Une fisicamente GPIO 47 con GPIO 48 usando un jumper.
+ *    - No conectes GPIO 47 ni GPIO 48 a 5V; la Heltec trabaja a 3.3V.
+ *    - Se usa CHANGE para activar la interrupcion tanto en subida como
+ *      en bajada, igual que en el codigo base.
  *
  * =====================================================================
  */
 
 #include <Arduino.h>
-
-// ── Pines ─────────────────────────────────────────────────────────────
-#define BUTTON_PIN   18       // GPIO con soporte de interrupción externa
-
-// ── Parámetros ────────────────────────────────────────────────────────
-#define DEBOUNCE_MS  50       // Tiempo mínimo entre pulsos válidos [ms]
-
-// ── Variables compartidas entre ISR y loop() ──────────────────────────
-// "volatile" indica que pueden cambiar en cualquier momento (en la ISR)
-// y evita que el compilador las optimice incorrectamente.
-volatile unsigned long pulseCount       = 0;
-volatile unsigned long lastDebounceTime = 0;
-
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 // =====================================================================
-//  ISR — Rutina de Servicio de Interrupción
-//  Se ejecuta automáticamente en cada flanco de bajada del botón.
-//  Debe ser corta y rápida: sin Serial, sin delay, sin malloc.
+//  Pines adaptados para Heltec WiFi LoRa 32 V3
 // =====================================================================
-void IRAM_ATTR onButtonPress() {
+#define EMU_PIN   47  // Pin que genera la senal emulada.
+#define LED_PIN   35  // Pin del LED integrado de la Heltec V3.
+#define INT_PIN   48  // Pin que recibe la interrupcion desde EMU_PIN.
+#define VEXT_PIN  36  // Pin que habilita la alimentacion externa/OLED.
 
-    unsigned long currentTime = millis();
+// =====================================================================
+//  Pantalla OLED integrada
+// =====================================================================
+#define OLED_WIDTH   128
+#define OLED_HEIGHT  64
+#define OLED_ADDR    0x3C
+#define OLED_SDA     17
+#define OLED_SCL     18
+#define OLED_RST     21
 
-    // Antirrebote software: solo cuenta si pasó el tiempo mínimo
-    if ((currentTime - lastDebounceTime) >= DEBOUNCE_MS) {
-        pulseCount++;
-        lastDebounceTime = currentTime;
-    }
+// =====================================================================
+//  Variables compartidas con la ISR; usan volatile porque cambian dentro
+//  de la interrupcion y el loop debe leer siempre su valor mas reciente.
+// =====================================================================
+volatile bool          ledState            = LOW;   // Guarda el estado actual del LED.
+volatile bool          displayNeedsUpdate  = true;  // Avisa al loop que debe actualizar la OLED.
+volatile unsigned long interruptCount      = 0;     // Cuenta cuantas interrupciones han ocurrido.
+
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RST);
+
+// =====================================================================
+//  ISR: se ejecuta con cada cambio detectado en INT_PIN; alterna el LED,
+//  suma una interrupcion al contador y marca la OLED para refrescarse.
+// =====================================================================
+void IRAM_ATTR blink() {
+    ledState = !ledState;
+    interruptCount++;
+    displayNeedsUpdate = true;
+
+    digitalWrite(LED_PIN, ledState);
 }
 
+// =====================================================================
+//  Actualiza la pantalla OLED con el contador y el estado del LED
+// =====================================================================
+void updateDisplay(unsigned long count, bool ledOn) {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setTextSize(1);
+    display.setCursor(2, 0);
+    display.println("Interrupciones");
+    
+
+    display.setTextSize(2);
+    display.setCursor(0, 26);
+    display.print("Cnt: ");
+    display.println(count);
+
+    display.setTextSize(1);
+    display.setCursor(0, 54);
+    display.print("LED: ");
+    display.println(ledOn ? "ON" : "OFF");
+
+    display.display();
+}
 
 // =====================================================================
 //  SETUP
 // =====================================================================
 void setup() {
-
     Serial.begin(115200);
 
-    // Pull-up interno: pin en HIGH en reposo, LOW al presionar el botón
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    pinMode(EMU_PIN, OUTPUT);        // Configura GPIO47 como salida.
+    pinMode(LED_PIN, OUTPUT);        // Configura el LED integrado como salida.
+    pinMode(INT_PIN, INPUT_PULLUP);  // Configura GPIO48 como entrada con pull-up.
+    pinMode(VEXT_PIN, OUTPUT);       // Configura el control de alimentacion OLED.
 
-    // Registra la ISR en flanco de bajada (HIGH → LOW)
-    attachInterrupt(
-        digitalPinToInterrupt(BUTTON_PIN),  // número de interrupción del GPIO
-        onButtonPress,                       // función a ejecutar
-        FALLING                              // tipo de flanco
-    );
+    digitalWrite(EMU_PIN, LOW);      // Inicia la senal emulada en estado bajo.
+    digitalWrite(LED_PIN, LOW);      // Inicia el LED apagado.
 
-    Serial.println("================================================");
-    Serial.println(" EJ1: Conteo de pulsos con antirrebote");
-    Serial.println(" Presiona el boton y observa el conteo.");
-    Serial.println("================================================");
+    // Habilita la alimentacion externa/OLED en Heltec.
+    digitalWrite(VEXT_PIN, LOW);
+    delay(100);
+
+    Wire.begin(OLED_SDA, OLED_SCL);
+
+    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+        Serial.println("No se detecto la pantalla OLED");
+    } else {
+        updateDisplay(0, ledState);
+    }
+
+    attachInterrupt(digitalPinToInterrupt(INT_PIN), blink, CHANGE);  // Ejecuta blink() en cada cambio de GPIO48.
 }
-
 
 // =====================================================================
 //  LOOP
 // =====================================================================
 void loop() {
+    static unsigned long lastToggle = 0;
+    static bool          emuState   = LOW;
 
-    static unsigned long lastPrint = 0;
+    // Emula una senal cuadrada para disparar la interrupcion.
+    if (millis() - lastToggle >= 150) {  // Cambia el estado cada 150 ms.
+        lastToggle = millis();       // Guarda el tiempo del ultimo cambio.
+        emuState   = !emuState;      // Invierte la senal emulada HIGH/LOW.
+        digitalWrite(EMU_PIN, emuState);
+    }
 
-    if (millis() - lastPrint >= 200) {
-        lastPrint = millis();
-
-        // Sección crítica: deshabilita interrupciones para leer
-        // la variable volatile de forma segura (operación atómica)
+    if (displayNeedsUpdate) {
         noInterrupts();
-            unsigned long count = pulseCount;
+
+        unsigned long count = interruptCount;
+        bool          ledOn = ledState;
+
+        displayNeedsUpdate  = false;
+
         interrupts();
 
-        Serial.print("Pulsos contados: ");
-        Serial.println(count);
+        Serial.print("Interrupciones: ");
+        Serial.print(count);
+        Serial.print(" | LED: ");
+        Serial.println(ledOn ? "ON" : "OFF");
+
+        updateDisplay(count, ledOn);
     }
 }
