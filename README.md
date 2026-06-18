@@ -29,3 +29,14 @@ Guidelines for contributing to the project.
 
 ## License
 This project is licensed under the MIT License.
+
+---
+
+## Estado del proyecto
+
+**COMPLETADO** — Semestre 2026-1 cerrado.
+
+- Fecha cierre: 2026-06-18
+- Materia: INSTRUMENTACION
+- Entrega: aprobada
+- Estado código: funcional, archivado
